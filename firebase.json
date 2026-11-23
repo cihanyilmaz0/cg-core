@@ -1,0 +1,18 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "SaaS İşletme",
+        "authorizedRedirectUris": [
+          "https://saas-isletme.firebaseapp.com/__/auth/handler",
+          "http://localhost"
+        ]
+      }
+    }
+  }
+}

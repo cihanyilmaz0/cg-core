@@ -1,0 +1,590 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model & Multi-Tenant Architecture
+// ===============================================================
+//
+// 1. users/{userId}
+//    - uid: string (required, immutable, must match request.auth.uid)
+//    - email: string (required, valid email, max 100 chars)
+//    - fullName: string (required, 1-100 chars)
+//    - businessId: string (required, immutable on self update, max 100 chars)
+//    - role: string (required, 'owner' | 'manager', immutable on self update)
+//    - createdAt: timestamp (required, immutable)
+//
+// 2. businesses/{businessId}
+//    - name: string (required, 1-100 chars)
+//    - sector: string (required, 1-50 chars)
+//    - taxNumber: string (optional, max 20 chars)
+//    - ownerUid: string (required, immutable, creator UID)
+//    - currency: string (required, 1-10 chars, e.g. 'TRY')
+//    - createdAt: timestamp (required, immutable)
+//
+// 3. businesses/{businessId}/branches/{branchId}
+//    - name: string (required, 1-100 chars)
+//    - isMain: bool (required)
+//    - address: string (optional, max 250 chars)
+//    - phone: string (optional, max 25 chars)
+//    - createdAt: timestamp (required, immutable)
+//
+// 4. businesses/{businessId}/employees/{employeeId}
+//    - fullName: string (required, 1-100 chars)
+//    - branchId: string (optional, max 100 chars)
+//    - position: string (optional, max 100 chars)
+//    - department: string (optional, max 100 chars)
+//    - phone: string (optional, max 25 chars)
+//    - email: string (optional, max 100 chars)
+//    - salaryType: string (optional, 'monthly' | 'daily' | 'Monthly' | 'Daily')
+//    - baseSalaryCents: int (optional, >= 0)
+//    - startDate: timestamp (optional)
+//    - endDate: timestamp (optional, null or timestamp)
+//    - isActive: bool (optional)
+//    - notes: string (optional, max 500 chars)
+//    - createdAt: timestamp (required, immutable)
+//
+// 5. businesses/{businessId}/employeeSalaryHistory/{salaryId}
+//    - employeeId: string (required, immutable, max 100 chars)
+//    - previousSalaryCents: int (required, >= 0)
+//    - newSalaryCents: int (required, >= 0)
+//    - changeDate: timestamp (required)
+//    - note: string (optional, max 250 chars)
+//    - changedBy: string (optional, max 100 chars)
+//    - createdAt: timestamp (required, immutable)
+//
+// 6. businesses/{businessId}/employeeTransactions/{transactionId}
+//    - employeeId: string (required, immutable, max 100 chars)
+//    - type: string (required, Advance, SalaryPayment, Bonus, Deduction, OtherPayment)
+//    - amountCents: int (required, >= 0)
+//    - date: timestamp (optional)
+//    - description: string (optional, max 500 chars)
+//    - createdBy: string (optional, max 100 chars)
+//    - createdAt: timestamp (required, immutable)
+//
+// 7. businesses/{businessId}/employeeLeaveRecords/{leaveId}
+//    - employeeId: string (required, immutable, max 100 chars)
+//    - leaveType: string (required, PaidLeave, UnpaidLeave, ExcusedAbsence, UnexcusedAbsence)
+//    - startDate: timestamp (required)
+//    - endDate: timestamp (required)
+//    - totalDays: number (optional, >= 0)
+//    - note: string (optional, max 500 chars)
+//    - createdAt: timestamp (required, immutable)
+//
+// 8. businesses/{businessId}/vehicles/{vehicleId}
+//    - plate: string (required, 1-20 chars)
+//    - brand: string (required, 1-50 chars)
+//    - model: string (optional, max 50 chars)
+//    - year: int (optional, 1900-2100)
+//    - branchId: string (optional, max 100 chars)
+//    - isActive: bool (optional)
+//    - vehicleType: string (optional, max 50 chars)
+//    - fuelType: string (optional, max 30 chars)
+//    - currentKm: int (optional, >= 0)
+//    - assignedEmployeeId: string (optional, max 100 chars)
+//    - assignedEmployeeName: string (optional, max 100 chars)
+//    - insuranceExpiryDate: timestamp (optional, null or timestamp)
+//    - cascoExpiryDate: timestamp (optional, null or timestamp)
+//    - inspectionExpiryDate: timestamp (optional, null or timestamp)
+//    - createdAt: timestamp (required, immutable)
+//
+// 9. businesses/{businessId}/vehicleMaintenanceRecords/{maintenanceId}
+//    - vehicleId: string (required, immutable, max 100 chars)
+//    - expenseType: string (required, 1-50 chars)
+//    - amountCents: int (required, >= 0)
+//    - date: timestamp (optional)
+//    - odometerKm: int (optional, >= 0)
+//    - note: string (optional, max 500 chars)
+//    - receiptUrl: string (optional, valid http/https URL or empty, max 1000 chars)
+//    - createdAt: timestamp (required, immutable)
+//
+// 10. businesses/{businessId}/expenses/{expenseId}
+//    - categoryId: string (required, max 100 chars)
+//    - categoryName: string (optional, max 100 chars)
+//    - amountCents: int (required, > 0)
+//    - title: string (optional, max 200 chars)
+//    - description: string (optional, max 500 chars)
+//    - branchId: string (optional, max 100 chars)
+//    - paymentMethod: string (optional, max 30 chars)
+//    - relatedVehicleId: string (optional, max 100 chars)
+//    - relatedEmployeeId: string (optional, max 100 chars)
+//    - date: timestamp (optional)
+//    - receiptUrl: string (optional, max 1000 chars)
+//    - createdBy: string (optional, max 100 chars)
+//    - createdAt: timestamp (required, immutable)
+//
+// 11. businesses/{businessId}/expenseCategories/{categoryId}
+//    - name: string (required, 1-50 chars)
+//    - iconCode: string (optional, max 50 chars)
+//    - colorHex: string (optional, max 10 chars)
+//    - isDefault: bool (optional)
+//    - createdAt: timestamp (required, immutable)
+//
+// 12. businesses/{businessId}/notifications/{notificationId}
+//    - title: string (required, 1-150 chars)
+//    - body: string (required, 1-500 chars)
+//    - type: string (optional, max 50 chars)
+//    - isRead: bool (required)
+//    - createdAt: timestamp (required, immutable)
+//
+// 13. businesses/{businessId}/reports/{periodId}
+//    - period: string (required, immutable, 1-50 chars)
+//    - totalRevenueCents: int (optional)
+//    - totalExpenseCents: int (optional)
+//    - netProfitCents: int (optional)
+//    - generatedAt: timestamp (optional)
+//    - createdAt: timestamp (required, immutable)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Global Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+             request.resource.data[field].size() >= minLen &&
+             request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+             email.size() <= 100 &&
+             email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    function isValidOptionalEmail(field) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() <= 100 &&
+              (isValidEmail(request.resource.data[field]) || request.resource.data[field] == ''));
+    }
+
+    function isValidOptionalUrl(field) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() <= 1000 &&
+              (request.resource.data[field].matches('^https?://.*') || request.resource.data[field] == ''));
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Multi-Tenant RBAC Helpers
+    // ===============================================================
+
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // User is owner if:
+    // 1. Their users/{uid} document has businessId == businessId AND role == 'owner'
+    // 2. OR businesses/{businessId} exists with ownerUid == request.auth.uid (handles initial bootstrap)
+    // 3. OR businesses/{businessId} is being created in the same atomic batch (getAfter)
+    function isTenantOwner(businessId) {
+      return isAuthenticated() && (
+        (hasUserDoc() && getUserData().businessId == businessId && getUserData().role == 'owner') ||
+        (exists(/databases/$(database)/documents/businesses/$(businessId)) && 
+         get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid) ||
+        (existsAfter(/databases/$(database)/documents/businesses/$(businessId)) && 
+         getAfter(/databases/$(database)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid)
+      );
+    }
+
+    // User is member if:
+    // 1. Their users/{uid} document has businessId == businessId
+    // 2. OR they are the business owner as evaluated by isTenantOwner
+    function isTenantMember(businessId) {
+      return isAuthenticated() && (
+        (hasUserDoc() && getUserData().businessId == businessId) ||
+        isTenantOwner(businessId)
+      );
+    }
+
+    // ===============================================================
+    // Domain Validator Functions (Mandatory Validator Function Pattern)
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'fullName', 'businessId', 'role', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'email', 'fullName', 'businessId', 'role', 'createdAt']) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             validStringLength('fullName', 1, 100) &&
+             data.businessId is string && data.businessId.size() <= 100 &&
+             data.role in ['owner', 'manager'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBusiness(data) {
+      return hasRequiredFields(['name', 'sector', 'ownerUid', 'currency', 'createdAt']) &&
+             hasOnlyAllowedFields(['name', 'sector', 'taxNumber', 'ownerUid', 'currency', 'createdAt']) &&
+             validStringLength('name', 1, 100) &&
+             validStringLength('sector', 1, 50) &&
+             isValidOptionalString('taxNumber', 1, 20) &&
+             data.ownerUid is string && data.ownerUid.size() <= 128 &&
+             validStringLength('currency', 1, 10) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBranch(data) {
+      return hasRequiredFields(['name', 'isMain', 'createdAt']) &&
+             hasOnlyAllowedFields(['name', 'isMain', 'address', 'phone', 'createdAt']) &&
+             validStringLength('name', 1, 100) &&
+             data.isMain is bool &&
+             isValidOptionalString('address', 0, 250) &&
+             isValidOptionalString('phone', 0, 25) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidEmployee(data) {
+      return hasRequiredFields(['fullName', 'createdAt']) &&
+             hasOnlyAllowedFields(['fullName', 'branchId', 'position', 'department', 'phone', 'email', 'salaryType', 'baseSalaryCents', 'startDate', 'endDate', 'isActive', 'notes', 'createdAt']) &&
+             validStringLength('fullName', 1, 100) &&
+             isValidOptionalString('branchId', 0, 100) &&
+             isValidOptionalString('position', 0, 100) &&
+             isValidOptionalString('department', 0, 100) &&
+             isValidOptionalString('phone', 0, 25) &&
+             isValidOptionalEmail('email') &&
+             (!('salaryType' in data) || data.salaryType in ['monthly', 'daily', 'Monthly', 'Daily']) &&
+             (!('baseSalaryCents' in data) || (data.baseSalaryCents is int && data.baseSalaryCents >= 0)) &&
+             (!('startDate' in data) || data.startDate is timestamp) &&
+             (!('endDate' in data) || data.endDate == null || data.endDate is timestamp) &&
+             (!('isActive' in data) || data.isActive is bool) &&
+             isValidOptionalString('notes', 0, 500) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidSalaryHistory(data) {
+      return hasRequiredFields(['employeeId', 'previousSalaryCents', 'newSalaryCents', 'changeDate', 'createdAt']) &&
+             hasOnlyAllowedFields(['employeeId', 'previousSalaryCents', 'newSalaryCents', 'changeDate', 'note', 'changedBy', 'createdAt']) &&
+             validStringLength('employeeId', 1, 100) &&
+             data.previousSalaryCents is int && data.previousSalaryCents >= 0 &&
+             data.newSalaryCents is int && data.newSalaryCents >= 0 &&
+             data.changeDate is timestamp &&
+             isValidOptionalString('note', 0, 250) &&
+             isValidOptionalString('changedBy', 0, 100) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidEmployeeTransaction(data) {
+      return hasRequiredFields(['employeeId', 'type', 'amountCents', 'createdAt']) &&
+             hasOnlyAllowedFields(['employeeId', 'type', 'amountCents', 'date', 'description', 'createdBy', 'createdAt']) &&
+             validStringLength('employeeId', 1, 100) &&
+             data.type in ['Advance', 'SalaryPayment', 'Bonus', 'Deduction', 'OtherPayment', 'advance', 'salaryPayment', 'bonus', 'deduction', 'otherPayment'] &&
+             data.amountCents is int && data.amountCents >= 0 &&
+             (!('date' in data) || data.date is timestamp) &&
+             isValidOptionalString('description', 0, 500) &&
+             isValidOptionalString('createdBy', 0, 100) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidLeaveRecord(data) {
+      return hasRequiredFields(['employeeId', 'leaveType', 'startDate', 'endDate', 'createdAt']) &&
+             hasOnlyAllowedFields(['employeeId', 'leaveType', 'startDate', 'endDate', 'totalDays', 'note', 'createdAt']) &&
+             validStringLength('employeeId', 1, 100) &&
+             data.leaveType in ['PaidLeave', 'UnpaidLeave', 'ExcusedAbsence', 'UnexcusedAbsence', 'paidLeave', 'unpaidLeave', 'excusedAbsence', 'unexcusedAbsence'] &&
+             data.startDate is timestamp &&
+             data.endDate is timestamp &&
+             (!('totalDays' in data) || (data.totalDays is number && data.totalDays >= 0)) &&
+             isValidOptionalString('note', 0, 500) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidVehicle(data) {
+      return hasRequiredFields(['plate', 'brand', 'createdAt']) &&
+             hasOnlyAllowedFields([
+               'plate', 'brand', 'model', 'year', 'branchId', 'isActive',
+               'vehicleType', 'fuelType', 'currentKm',
+               'assignedEmployeeId', 'assignedEmployeeName',
+               'insuranceExpiryDate', 'cascoExpiryDate', 'inspectionExpiryDate',
+               'createdAt'
+             ]) &&
+             validStringLength('plate', 1, 20) &&
+             validStringLength('brand', 1, 50) &&
+             isValidOptionalString('model', 0, 50) &&
+             (!('year' in data) || (data.year is int && data.year >= 1900 && data.year <= 2100)) &&
+             isValidOptionalString('branchId', 0, 100) &&
+             (!('isActive' in data) || data.isActive is bool) &&
+             isValidOptionalString('vehicleType', 0, 50) &&
+             isValidOptionalString('fuelType', 0, 30) &&
+             (!('currentKm' in data) || (data.currentKm is int && data.currentKm >= 0)) &&
+             isValidOptionalString('assignedEmployeeId', 0, 100) &&
+             isValidOptionalString('assignedEmployeeName', 0, 100) &&
+             (!('insuranceExpiryDate' in data) || data.insuranceExpiryDate == null || data.insuranceExpiryDate is timestamp) &&
+             (!('cascoExpiryDate' in data) || data.cascoExpiryDate == null || data.cascoExpiryDate is timestamp) &&
+             (!('inspectionExpiryDate' in data) || data.inspectionExpiryDate == null || data.inspectionExpiryDate is timestamp) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidVehicleMaintenance(data) {
+      return hasRequiredFields(['vehicleId', 'expenseType', 'amountCents', 'createdAt']) &&
+             hasOnlyAllowedFields(['vehicleId', 'expenseType', 'amountCents', 'date', 'odometerKm', 'note', 'receiptUrl', 'createdAt']) &&
+             validStringLength('vehicleId', 1, 100) &&
+             validStringLength('expenseType', 1, 50) &&
+             data.amountCents is int && data.amountCents >= 0 &&
+             (!('date' in data) || data.date is timestamp) &&
+             (!('odometerKm' in data) || (data.odometerKm is int && data.odometerKm >= 0)) &&
+             isValidOptionalString('note', 0, 500) &&
+             isValidOptionalUrl('receiptUrl') &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidExpense(data) {
+      return hasRequiredFields(['categoryId', 'amountCents', 'createdAt']) &&
+             hasOnlyAllowedFields([
+               'categoryId', 'categoryName', 'amountCents', 'title', 'description',
+               'branchId', 'paymentMethod', 'relatedVehicleId', 'relatedEmployeeId',
+               'date', 'receiptUrl', 'createdBy', 'createdAt'
+             ]) &&
+             validStringLength('categoryId', 1, 100) &&
+             isValidOptionalString('categoryName', 0, 100) &&
+             data.amountCents is int && data.amountCents > 0 &&
+             isValidOptionalString('title', 0, 200) &&
+             isValidOptionalString('description', 0, 500) &&
+             isValidOptionalString('branchId', 0, 100) &&
+             isValidOptionalString('paymentMethod', 0, 30) &&
+             isValidOptionalString('relatedVehicleId', 0, 100) &&
+             isValidOptionalString('relatedEmployeeId', 0, 100) &&
+             (!('date' in data) || data.date is timestamp) &&
+             isValidOptionalUrl('receiptUrl') &&
+             isValidOptionalString('createdBy', 0, 100) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidExpenseCategory(data) {
+      return hasRequiredFields(['name', 'createdAt']) &&
+             hasOnlyAllowedFields(['name', 'iconCode', 'colorHex', 'isDefault', 'createdAt']) &&
+             validStringLength('name', 1, 50) &&
+             isValidOptionalString('iconCode', 0, 50) &&
+             isValidOptionalString('colorHex', 0, 10) &&
+             (!('isDefault' in data) || data.isDefault is bool) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidNotification(data) {
+      return hasRequiredFields(['title', 'body', 'isRead', 'createdAt']) &&
+             hasOnlyAllowedFields(['title', 'body', 'type', 'isRead', 'createdAt']) &&
+             validStringLength('title', 1, 150) &&
+             validStringLength('body', 1, 500) &&
+             isValidOptionalString('type', 0, 50) &&
+             data.isRead is bool &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidReport(data) {
+      return hasRequiredFields(['period', 'createdAt']) &&
+             hasOnlyAllowedFields(['period', 'totalRevenueCents', 'totalExpenseCents', 'netProfitCents', 'generatedAt', 'createdAt']) &&
+             validStringLength('period', 1, 50) &&
+             (!('totalRevenueCents' in data) || data.totalRevenueCents is int) &&
+             (!('totalExpenseCents' in data) || data.totalExpenseCents is int) &&
+             (!('netProfitCents' in data) || data.netProfitCents is int) &&
+             (!('generatedAt' in data) || data.generatedAt is timestamp) &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // ---------------------------------------------------------------
+    // 1. Users Profile Collection
+    // ---------------------------------------------------------------
+    match /users/{userId} {
+      // PII Protection: Users can only read their own profile
+      allow read: if isOwner(userId);
+
+      // Create: Authenticated user creating their own document.
+      // - If claiming 'owner' role: must verify ownership of the business referenced.
+      // - If claiming 'manager' role: must match valid role.
+      allow create: if isOwner(userId) &&
+                      isValidUser(request.resource.data) &&
+                      (
+                        (request.resource.data.role == 'owner' && (
+                          (exists(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)) && 
+                           get(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerUid == request.auth.uid) ||
+                          (existsAfter(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)) && 
+                           getAfter(/databases/$(database)/documents/businesses/$(request.resource.data.businessId)).data.ownerUid == request.auth.uid)
+                        )) ||
+                        request.resource.data.role == 'manager'
+                      );
+
+      // Update: User can only update their profile info.
+      // Anti-privilege escalation & anti-tenant hopping: uid, role, businessId, and createdAt are immutable!
+      allow update: if isOwner(userId) &&
+                      isValidUser(request.resource.data) &&
+                      areImmutableFieldsUnchanged(['uid', 'createdAt', 'role', 'businessId']);
+
+      // Hard delete disabled: profiles must be archived or handled by business lifecycle
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // 2. Businesses Collection & Subcollections (Multi-Tenant)
+    // ---------------------------------------------------------------
+    match /businesses/{businessId} {
+      // Read: Any verified tenant member
+      allow read: if isTenantMember(businessId);
+
+      // Create: Initial creation by authenticated business owner
+      allow create: if isAuthenticated() &&
+                      isValidBusiness(request.resource.data) &&
+                      request.resource.data.ownerUid == request.auth.uid;
+
+      // Update: Only business owner can update business settings
+      allow update: if isTenantOwner(businessId) &&
+                      isValidBusiness(request.resource.data) &&
+                      areImmutableFieldsUnchanged(['ownerUid', 'createdAt']);
+
+      // Delete: Only business owner can delete their business
+      allow delete: if isTenantOwner(businessId);
+
+      // -------------------------------------------------------------
+      // Subcollection: Branches
+      // -------------------------------------------------------------
+      match /branches/{branchId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidBranch(request.resource.data);
+        allow update: if isTenantMember(businessId) && isValidBranch(request.resource.data) && areImmutableFieldsUnchanged(['createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Employees
+      // -------------------------------------------------------------
+      match /employees/{employeeId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidEmployee(request.resource.data);
+        allow update: if isTenantMember(businessId) && isValidEmployee(request.resource.data) && areImmutableFieldsUnchanged(['createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Employee Salary History
+      // -------------------------------------------------------------
+      match /employeeSalaryHistory/{salaryId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidSalaryHistory(request.resource.data);
+        allow update: if isTenantOwner(businessId) && isValidSalaryHistory(request.resource.data) && areImmutableFieldsUnchanged(['employeeId', 'createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Employee Transactions (Financial Records)
+      // -------------------------------------------------------------
+      match /employeeTransactions/{transactionId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidEmployeeTransaction(request.resource.data);
+        allow update: if isTenantOwner(businessId) && isValidEmployeeTransaction(request.resource.data) && areImmutableFieldsUnchanged(['employeeId', 'createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Employee Leave Records
+      // -------------------------------------------------------------
+      match /employeeLeaveRecords/{leaveId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidLeaveRecord(request.resource.data);
+        allow update: if isTenantMember(businessId) && isValidLeaveRecord(request.resource.data) && areImmutableFieldsUnchanged(['employeeId', 'createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Vehicles
+      // -------------------------------------------------------------
+      match /vehicles/{vehicleId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidVehicle(request.resource.data);
+        allow update: if isTenantMember(businessId) && isValidVehicle(request.resource.data) && areImmutableFieldsUnchanged(['createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Vehicle Maintenance Records (Financial Records)
+      // -------------------------------------------------------------
+      match /vehicleMaintenanceRecords/{maintenanceId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidVehicleMaintenance(request.resource.data);
+        allow update: if isTenantOwner(businessId) && isValidVehicleMaintenance(request.resource.data) && areImmutableFieldsUnchanged(['vehicleId', 'createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Expenses (Financial Records)
+      // -------------------------------------------------------------
+      match /expenses/{expenseId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidExpense(request.resource.data);
+        allow update: if isTenantOwner(businessId) && isValidExpense(request.resource.data) && areImmutableFieldsUnchanged(['createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Expense Categories
+      // -------------------------------------------------------------
+      match /expenseCategories/{categoryId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidExpenseCategory(request.resource.data);
+        allow update: if isTenantMember(businessId) && isValidExpenseCategory(request.resource.data) && areImmutableFieldsUnchanged(['createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Notifications
+      // -------------------------------------------------------------
+      match /notifications/{notificationId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidNotification(request.resource.data);
+        allow update: if isTenantMember(businessId) && isValidNotification(request.resource.data) && areImmutableFieldsUnchanged(['createdAt']);
+        allow delete: if isTenantMember(businessId);
+      }
+
+      // -------------------------------------------------------------
+      // Subcollection: Reports
+      // -------------------------------------------------------------
+      match /reports/{periodId} {
+        allow read: if isTenantMember(businessId);
+        allow create: if isTenantMember(businessId) && isValidReport(request.resource.data);
+        allow update: if isTenantMember(businessId) && isValidReport(request.resource.data) && areImmutableFieldsUnchanged(['period', 'createdAt']);
+        allow delete: if isTenantOwner(businessId);
+      }
+    }
+
+    // ===============================================================
+    // Default Deny Rule (Catch-all for unmatched paths)
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
