@@ -14,6 +14,8 @@ import '../../modules/expenses/views/expense_form_view.dart';
 import '../../modules/expenses/views/expenses_list_view.dart';
 import '../../modules/reports/bindings/reports_binding.dart';
 import '../../modules/reports/views/reports_view.dart';
+import '../../modules/settings/bindings/settings_binding.dart';
+import '../../modules/settings/views/settings_view.dart';
 import '../../modules/shell/bindings/main_shell_binding.dart';
 import '../../modules/shell/views/main_shell_view.dart';
 import '../../modules/splash/bindings/splash_binding.dart';
@@ -104,6 +106,11 @@ class AppPages {
       name: AppRoutes.reports,
       page: () => const ReportsView(),
       binding: ReportsBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.settings,
+      page: () => const SettingsView(),
+      binding: SettingsBinding(),
     ),
   ];
 }

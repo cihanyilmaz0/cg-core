@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/routes/app_routes.dart';
+import '../../../core/utils/app_snackbar.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../controllers/dashboard_controller.dart';
@@ -46,12 +48,20 @@ class DashboardView extends GetView<DashboardController> {
           IconButton(
             icon: const Icon(Icons.notifications_none_rounded),
             tooltip: 'Bildirimler',
-            onPressed: () => Get.snackbar('Bildirimler', 'Yeni bildiriminiz bulunmuyor.'),
+            onPressed: () {
+              final count = controller.upcomingAlertCount.value;
+              AppSnackbar.showInfo(
+                'Bildirimler',
+                count > 0
+                    ? '$count adet yaklaşan araç sigorta/muayene uyarınız var.'
+                    : 'Yeni bildiriminiz bulunmuyor.',
+              );
+            },
           ),
           IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Çıkış Yap',
-            onPressed: controller.logout,
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Ayarlar',
+            onPressed: () => Get.toNamed(AppRoutes.settings),
           ),
           const SizedBox(width: 4),
         ],

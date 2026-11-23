@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/app_colors.dart';
@@ -6,6 +7,7 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../settings/views/legal_document_view.dart';
 import '../controllers/auth_controller.dart';
 
 class RegisterBusinessView extends GetView<AuthController> {
@@ -167,7 +169,64 @@ class RegisterBusinessView extends GetView<AuthController> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                Obx(
+                  () => Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Checkbox(
+                        value: controller.acceptedTerms.value,
+                        onChanged: (val) => controller.acceptedTerms.value = val ?? false,
+                        activeColor: AppColors.primary,
+                      ),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: AppColors.textSecondaryLight,
+                              height: 1.4,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'Gizlilik Politikası',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => Get.to(
+                                        () => const LegalDocumentView(
+                                          type: LegalDocumentType.privacyPolicy,
+                                        ),
+                                      ),
+                              ),
+                              const TextSpan(text: ' ve '),
+                              TextSpan(
+                                text: 'Kullanım Koşulları',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => Get.to(
+                                        () => const LegalDocumentView(
+                                          type: LegalDocumentType.termsOfUse,
+                                        ),
+                                      ),
+                              ),
+                              const TextSpan(text: "'nı okudum ve kabul ediyorum."),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
                 Obx(
                   () => AppButton(
                     text: 'İşletmeyi Kaydet ve Başla',

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/app_colors.dart';
@@ -317,21 +318,30 @@ class ExpensesListView extends GetView<ExpensesController> {
               ],
             ),
             InteractiveViewer(
-              child: Image.network(
-                url,
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return const Padding(
-                    padding: EdgeInsets.all(48.0),
-                    child: CircularProgressIndicator(),
-                  );
-                },
-                errorBuilder: (_, _, _) => const Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: Text('Görsel yüklenemedi.'),
-                ),
-              ),
+              child: url.startsWith('data:image/')
+                  ? Image.memory(
+                      base64Decode(url.split(',').last),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Text('Görsel çözümlenemedi.'),
+                      ),
+                    )
+                  : Image.network(
+                      url,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const Padding(
+                          padding: EdgeInsets.all(48.0),
+                          child: CircularProgressIndicator(),
+                        );
+                      },
+                      errorBuilder: (_, _, _) => const Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Text('Görsel yüklenemedi.'),
+                      ),
+                    ),
             ),
           ],
         ),

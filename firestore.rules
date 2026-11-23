@@ -93,7 +93,7 @@ rules_version = '2';
 //    - date: timestamp (optional)
 //    - odometerKm: int (optional, >= 0)
 //    - note: string (optional, max 500 chars)
-//    - receiptUrl: string (optional, valid http/https URL or empty, max 1000 chars)
+//    - receiptUrl: string (optional, empty, valid http/https URL max 1000 chars, or base64 image data URI max 400000 chars)
 //    - createdAt: timestamp (required, immutable)
 //
 // 10. businesses/{businessId}/expenses/{expenseId}
@@ -107,7 +107,7 @@ rules_version = '2';
 //    - relatedVehicleId: string (optional, max 100 chars)
 //    - relatedEmployeeId: string (optional, max 100 chars)
 //    - date: timestamp (optional)
-//    - receiptUrl: string (optional, max 1000 chars)
+//    - receiptUrl: string (optional, empty, valid http/https URL max 1000 chars, or base64 image data URI max 400000 chars)
 //    - createdBy: string (optional, max 100 chars)
 //    - createdAt: timestamp (required, immutable)
 //
@@ -189,6 +189,18 @@ service cloud.firestore {
              (request.resource.data[field] is string &&
               request.resource.data[field].size() <= 1000 &&
               (request.resource.data[field].matches('^https?://.*') || request.resource.data[field] == ''));
+    }
+
+    function isValidOptionalReceiptUrl(field) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              (
+                request.resource.data[field] == '' ||
+                (request.resource.data[field].size() <= 1000 &&
+                 request.resource.data[field].matches('^https?://.*')) ||
+                (request.resource.data[field].size() <= 400000 &&
+                 request.resource.data[field].matches('^data:image/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$'))
+              ));
     }
 
     function areImmutableFieldsUnchanged(fields) {
@@ -356,7 +368,7 @@ service cloud.firestore {
              (!('date' in data) || data.date is timestamp) &&
              (!('odometerKm' in data) || (data.odometerKm is int && data.odometerKm >= 0)) &&
              isValidOptionalString('note', 0, 500) &&
-             isValidOptionalUrl('receiptUrl') &&
+             isValidOptionalReceiptUrl('receiptUrl') &&
              data.createdAt is timestamp;
     }
 
@@ -377,7 +389,7 @@ service cloud.firestore {
              isValidOptionalString('relatedVehicleId', 0, 100) &&
              isValidOptionalString('relatedEmployeeId', 0, 100) &&
              (!('date' in data) || data.date is timestamp) &&
-             isValidOptionalUrl('receiptUrl') &&
+             isValidOptionalReceiptUrl('receiptUrl') &&
              isValidOptionalString('createdBy', 0, 100) &&
              data.createdAt is timestamp;
     }

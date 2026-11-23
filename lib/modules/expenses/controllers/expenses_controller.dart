@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_enums.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/storage_service.dart';
@@ -165,11 +167,47 @@ class ExpensesController extends GetxController {
 
   Future<void> pickReceiptImage(ImageSource source) async {
     try {
+      if (!kIsWeb) {
+        if (source == ImageSource.camera) {
+          final status = await Permission.camera.request();
+          if (!status.isGranted) {
+            if (status.isPermanentlyDenied) {
+              _showPermissionSettingsDialog('Kamera İzni Gerekli',
+                  'Fiş fotoğrafı çekebilmek için ayarlardan kamera iznini açmanız gerekiyor.');
+            } else {
+              AppSnackbar.showError(
+                'İzin Gerekli',
+                'Fiş fotoğrafı çekmek için kamera izni vermeniz gerekiyor.',
+              );
+            }
+            return;
+          }
+        } else if (source == ImageSource.gallery) {
+          var status = await Permission.photos.request();
+          if (!status.isGranted && !status.isLimited) {
+            // Android 12 ve altı cihazlar için depolama iznini dene
+            final storageStatus = await Permission.storage.request();
+            if (!storageStatus.isGranted) {
+              if (status.isPermanentlyDenied || storageStatus.isPermanentlyDenied) {
+                _showPermissionSettingsDialog('Galeri İzni Gerekli',
+                    'Galeriden fiş seçebilmek için ayarlardan fotoğraf/medya iznini açmanız gerekiyor.');
+              } else {
+                AppSnackbar.showError(
+                  'İzin Gerekli',
+                  'Galeriden fiş seçmek için fotoğraf erişim izni vermeniz gerekiyor.',
+                );
+              }
+              return;
+            }
+          }
+        }
+      }
+
       final XFile? file = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 80,
+        maxWidth: 900,
+        maxHeight: 900,
+        imageQuality: 65,
       );
       if (file != null) {
         pickedReceiptFile.value = file;
@@ -177,6 +215,32 @@ class ExpensesController extends GetxController {
     } catch (e) {
       AppSnackbar.showError('Hata', 'Fotoğraf seçilemedi: $e');
     }
+  }
+
+  void _showPermissionSettingsDialog(String title, String message) {
+    final context = Get.context;
+    if (context == null) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              openAppSettings();
+            },
+            child: const Text('Ayarlara Git'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<bool> saveExpense() async {
@@ -238,7 +302,11 @@ class ExpensesController extends GetxController {
 
   Future<void> deleteExpense(String expenseId) async {
     try {
+      final target = expenses.firstWhereOrNull((e) => e.id == expenseId);
       await _expenseRepository.deleteExpense(expenseId);
+      if (target?.receiptUrl != null) {
+        await _storageService.deleteByUrl(target!.receiptUrl);
+      }
       expenses.removeWhere((e) => e.id == expenseId);
       AppSnackbar.showInfo('Silindi', 'Gider kaydı silindi.');
     } catch (e) {

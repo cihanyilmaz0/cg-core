@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../core/constants/app_enums.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/utils/app_snackbar.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/business_repository.dart';
@@ -29,6 +30,7 @@ class AuthController extends GetxController {
   // State observables
   final RxBool isLoading = false.obs;
   final RxBool isPasswordVisible = false.obs;
+  final RxBool acceptedTerms = false.obs;
   final RxString errorMessage = ''.obs;
 
   void togglePasswordVisibility() {
@@ -109,6 +111,13 @@ class AuthController extends GetxController {
 
   Future<void> registerBusiness() async {
     if (!registerFormKey.currentState!.validate()) return;
+    if (!acceptedTerms.value) {
+      AppSnackbar.showError(
+        'Onay Gerekli',
+        'Devam etmek için Gizlilik Politikası ve Kullanım Koşullarını onaylamanız gerekmektedir.',
+      );
+      return;
+    }
 
     try {
       isLoading.value = true;
