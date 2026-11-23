@@ -167,39 +167,21 @@ class ExpensesController extends GetxController {
 
   Future<void> pickReceiptImage(ImageSource source) async {
     try {
-      if (!kIsWeb) {
-        if (source == ImageSource.camera) {
-          final status = await Permission.camera.request();
-          if (!status.isGranted) {
-            if (status.isPermanentlyDenied) {
-              _showPermissionSettingsDialog('Kamera İzni Gerekli',
-                  'Fiş fotoğrafı çekebilmek için ayarlardan kamera iznini açmanız gerekiyor.');
-            } else {
-              AppSnackbar.showError(
-                'İzin Gerekli',
-                'Fiş fotoğrafı çekmek için kamera izni vermeniz gerekiyor.',
-              );
-            }
-            return;
+      if (!kIsWeb && source == ImageSource.camera) {
+        final status = await Permission.camera.request();
+        if (!status.isGranted) {
+          if (status.isPermanentlyDenied) {
+            _showPermissionSettingsDialog(
+              'Kamera İzni Gerekli',
+              'Fiş fotoğrafı çekebilmek için ayarlardan kamera iznini açmanız gerekiyor.',
+            );
+          } else {
+            AppSnackbar.showError(
+              'İzin Gerekli',
+              'Fiş fotoğrafı çekmek için kamera izni vermeniz gerekiyor.',
+            );
           }
-        } else if (source == ImageSource.gallery) {
-          var status = await Permission.photos.request();
-          if (!status.isGranted && !status.isLimited) {
-            // Android 12 ve altı cihazlar için depolama iznini dene
-            final storageStatus = await Permission.storage.request();
-            if (!storageStatus.isGranted) {
-              if (status.isPermanentlyDenied || storageStatus.isPermanentlyDenied) {
-                _showPermissionSettingsDialog('Galeri İzni Gerekli',
-                    'Galeriden fiş seçebilmek için ayarlardan fotoğraf/medya iznini açmanız gerekiyor.');
-              } else {
-                AppSnackbar.showError(
-                  'İzin Gerekli',
-                  'Galeriden fiş seçmek için fotoğraf erişim izni vermeniz gerekiyor.',
-                );
-              }
-              return;
-            }
-          }
+          return;
         }
       }
 
