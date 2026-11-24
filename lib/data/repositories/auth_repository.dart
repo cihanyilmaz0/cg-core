@@ -20,7 +20,14 @@ abstract class IAuthRepository {
 
 class AuthRepository implements IAuthRepository {
   final FirebaseService _firebaseService = FirebaseService.to;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  bool _isGoogleSignInInitialized = false;
+
+  Future<void> _ensureGoogleSignInInitialized() async {
+    if (!_isGoogleSignInInitialized) {
+      await GoogleSignIn.instance.initialize();
+      _isGoogleSignInInitialized = true;
+    }
+  }
 
   @override
   Stream<User?> get authStateChanges => _firebaseService.auth.authStateChanges();
@@ -55,18 +62,21 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<UserCredential> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        throw 'Google ile giriş kullanıcı tarafından iptal edildi.';
-      }
+      await _ensureGoogleSignInInitialized();
+      final GoogleSignInAccount googleUser =
+          await GoogleSignIn.instance.authenticate();
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final OAuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
       return await _firebaseService.auth.signInWithCredential(credential);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw 'Google ile giriş kullanıcı tarafından iptal edildi.';
+      }
+      throw e.description ?? e.toString();
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
@@ -86,7 +96,7 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
+      await GoogleSignIn.instance.signOut();
     } catch (_) {}
     await _firebaseService.auth.signOut();
   }
