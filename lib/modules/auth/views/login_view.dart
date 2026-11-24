@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/app_colors.dart';
@@ -169,7 +170,7 @@ class LoginView extends GetView<AuthController> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                const Text(
+                                 const Text(
                                   'Google ile Giriş Yap',
                                   style: TextStyle(
                                     fontSize: 15,
@@ -180,6 +181,36 @@ class LoginView extends GetView<AuthController> {
                               ],
                             ),
                           ),
+                          if (!kIsWeb &&
+                              defaultTargetPlatform == TargetPlatform.iOS) ...[
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: controller.signInWithApple,
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 50),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.apple, size: 22),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Apple ile Giriş Yap',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

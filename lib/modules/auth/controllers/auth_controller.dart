@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/app_enums.dart';
@@ -72,19 +73,32 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> signInWithGoogle() async {
+  Future<void> signInWithGoogle() => _signInWithSocialProvider(
+        _authRepository.signInWithGoogle,
+        'Google Girişi Başarısız',
+      );
+
+  Future<void> signInWithApple() => _signInWithSocialProvider(
+        _authRepository.signInWithApple,
+        'Apple Girişi Başarısız',
+      );
+
+  Future<void> _signInWithSocialProvider(
+    Future<UserCredential> Function() signInFn,
+    String errorTitle,
+  ) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
 
-      final credential = await _authRepository.signInWithGoogle();
+      final credential = await signInFn();
       final user = credential.user;
       if (user == null) return;
 
       final userProfile = await _authRepository.getUserProfile(user.uid);
 
       if (userProfile == null || userProfile.businessId.isEmpty) {
-        // Yeni veya işletmesiz kullanıcı -> Google bilgileriyle onboarding'e yönlendir
+        // Yeni veya işletmesiz kullanıcı -> sosyal giriş bilgileriyle onboarding'e yönlendir
         ownerFullNameController.text = user.displayName ?? '';
         registerEmailController.text = user.email ?? '';
         Get.offAllNamed(AppRoutes.registerBusiness);
@@ -96,7 +110,7 @@ class AuthController extends GetxController {
       if (!e.toString().contains('iptal edildi')) {
         errorMessage.value = e.toString();
         Get.snackbar(
-          'Google Girişi Başarısız',
+          errorTitle,
           e.toString(),
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red.shade800,

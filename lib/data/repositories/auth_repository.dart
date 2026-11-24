@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/services/firebase_service.dart';
 import '../models/user_model.dart';
@@ -11,6 +16,7 @@ abstract class IAuthRepository {
   Future<UserCredential> signInWithEmailAndPassword(String email, String password);
   Future<UserCredential> createUserWithEmailAndPassword(String email, String password);
   Future<UserCredential> signInWithGoogle();
+  Future<UserCredential> signInWithApple();
   Future<void> sendPasswordResetEmail(String email);
   Future<void> signOut();
   Future<UserModel?> getUserProfile(String uid);
@@ -82,6 +88,69 @@ class AuthRepository implements IAuthRepository {
     } catch (e) {
       throw e.toString();
     }
+  }
+
+  @override
+  Future<UserCredential> signInWithApple() async {
+    try {
+      final rawNonce = _generateNonce();
+      final hashedNonce = _sha256ofString(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+        rawNonce: rawNonce,
+      );
+
+      final userCredential =
+          await _firebaseService.auth.signInWithCredential(oauthCredential);
+
+      final fullName = [
+        appleCredential.givenName,
+        appleCredential.familyName,
+      ].where((part) => part != null && part.trim().isNotEmpty).join(' ');
+
+      if (fullName.isNotEmpty &&
+          (userCredential.user?.displayName?.trim().isEmpty ?? true)) {
+        await userCredential.user?.updateDisplayName(fullName);
+        await userCredential.user?.reload();
+      }
+
+      return userCredential;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw 'Apple ile giriş kullanıcı tarafından iptal edildi.';
+      }
+      throw e.message;
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw e.toString();
+    }
+  }
+
+  String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+      length,
+      (_) => charset[random.nextInt(charset.length)],
+    ).join();
+  }
+
+  String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
   }
 
   @override
