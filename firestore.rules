@@ -457,8 +457,8 @@ service cloud.firestore {
                       isValidUser(request.resource.data) &&
                       areImmutableFieldsUnchanged(['uid', 'createdAt', 'role', 'businessId']);
 
-      // Hard delete disabled: profiles must be archived or handled by business lifecycle
-      allow delete: if false;
+      // Delete: Authenticated users can delete their own profile document during in-app account deletion (App Store Guideline 5.1.1(v))
+      allow delete: if isOwner(userId);
     }
 
     // ---------------------------------------------------------------
